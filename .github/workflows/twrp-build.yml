@@ -128,6 +128,10 @@ jobs:
             --exclude '.github' \
             "$GITHUB_WORKSPACE/" device/pocketalk/pocketalks/
 
+          # Safety rewrite in case stale variants are reintroduced by future edits.
+          sed -i 's/^TARGET_ARCH_VARIANT := armv7-a-neon$/TARGET_ARCH_VARIANT := armv8-a/' \
+            device/pocketalk/pocketalks/BoardConfig.mk || true
+
       - name: Preflight sanity checks
         run: |
           set -euo pipefail
@@ -149,13 +153,36 @@ jobs:
             exit 1
           fi
 
+          echo "=== Any remaining armv7-a-neon references under device tree ==="
+          grep -R --line-number --fixed-strings 'armv7-a-neon' device/pocketalk/pocketalks || true
+
+      - name: Verify lunch and dumpvars
+        run: |
+          set -euo pipefail
+          cd "$HOME/twrp-src"
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+
+          if lunch omni_pocketalks-eng; then
+            echo "LUNCH_TARGET=omni_pocketalks-eng" >> "$GITHUB_ENV"
+          elif lunch omni_pocketalks-userdebug; then
+            echo "LUNCH_TARGET=omni_pocketalks-userdebug" >> "$GITHUB_ENV"
+          else
+            echo "Unable to lunch pocketalks product" >&2
+            exit 1
+          fi
+
+          echo "Resolved TARGET_ARCH=$(get_build_var TARGET_ARCH)"
+          echo "Resolved TARGET_ARCH_VARIANT=$(get_build_var TARGET_ARCH_VARIANT)"
+          echo "Resolved TARGET_CPU_VARIANT=$(get_build_var TARGET_CPU_VARIANT)"
+
       - name: Build recovery image
         run: |
           set -o pipefail
           cd "$HOME/twrp-src"
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
-          lunch omni_pocketalks-eng || lunch omni_pocketalks-userdebug
+          lunch "$LUNCH_TARGET"
           mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
       - name: Collect outputs
