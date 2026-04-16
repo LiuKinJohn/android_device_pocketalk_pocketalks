@@ -189,6 +189,20 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           lunch "$LUNCH_TARGET"
 
+          # Some source bases still wire recovery.img -> dtb.img even when dtb is not built.
+          # Provide a fallback dtb.img to unblock first-pass TWRP bring-up builds.
+          OUT_PRODUCT_DIR="out/target/product/pocketalks"
+          mkdir -p "$OUT_PRODUCT_DIR"
+          if [ ! -f "$OUT_PRODUCT_DIR/dtb.img" ]; then
+            if [ -f "device/pocketalk/pocketalks/prebuilt/odmdtbo-stock.bin" ]; then
+              cp "device/pocketalk/pocketalks/prebuilt/odmdtbo-stock.bin" "$OUT_PRODUCT_DIR/dtb.img"
+              echo "Prepared fallback dtb.img from odmdtbo-stock.bin"
+            else
+              : > "$OUT_PRODUCT_DIR/dtb.img"
+              echo "Prepared empty fallback dtb.img"
+            fi
+          fi
+
           MEM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
           JOBS=$(nproc --all)
           if [ "$MEM_KB" -lt 16777216 ]; then

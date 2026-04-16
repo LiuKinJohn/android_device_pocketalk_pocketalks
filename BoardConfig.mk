@@ -28,6 +28,7 @@ TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/kernel
 
 # Prebuilt-kernel porting path: do not require a generated dtb.img at build time.
 BOARD_INCLUDE_DTB_IN_BOOTIMG := false
+override BOARD_INCLUDE_DTB_IN_BOOTIMG := false
 BOARD_HAS_NO_SELECT_BUTTON := true
 BOARD_SUPPRESS_SECURE_ERASE := true
 TARGET_USERIMAGES_USE_EXT4 := true
