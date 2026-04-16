@@ -1,0 +1,110 @@
+name: Build TWRP (Pocketalk S)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - android-8.1
+    paths:
+      - .github/workflows/twrp-build.yml
+      - AndroidProducts.mk
+      - BoardConfig.mk
+      - omni_pocketalks.mk
+      - recovery/**
+      - prebuilt/**
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk and install dependencies
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          sudo apt-get update
+          sudo apt-get install -y repo rsync git-lfs
+
+      - name: Extract kernel from stock boot image
+        run: |
+          python3 - << 'PY'
+          import os
+          import struct
+
+          boot_img = "prebuilt/boot-stock.bin"
+          out_kernel = "prebuilt/kernel"
+
+          with open(boot_img, "rb") as f:
+              data = f.read()
+
+          if data[:8] != b"ANDROID!":
+              raise SystemExit("Invalid boot image magic in prebuilt/boot-stock.bin")
+
+          kernel_size = struct.unpack_from("<I", data, 8)[0]
+          page_size = struct.unpack_from("<I", data, 36)[0]
+
+          if page_size == 0:
+              raise SystemExit("Invalid page_size=0 in boot header")
+
+          kernel_offset = page_size
+          kernel_end = kernel_offset + kernel_size
+
+          if kernel_end > len(data):
+              raise SystemExit("Kernel range exceeds boot image size")
+
+          os.makedirs(os.path.dirname(out_kernel), exist_ok=True)
+          with open(out_kernel, "wb") as f:
+              f.write(data[kernel_offset:kernel_end])
+
+          print(f"Extracted kernel_size={kernel_size} page_size={page_size} -> {out_kernel}")
+          PY
+
+      - name: Init TWRP source
+        run: |
+          mkdir -p "$HOME/twrp-src"
+          cd "$HOME/twrp-src"
+          repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-9.0 --depth=1
+          repo sync -c --no-clone-bundle --no-tags -j"$(nproc --all)"
+
+      - name: Inject device tree
+        run: |
+          cd "$HOME/twrp-src"
+          mkdir -p device/pocketalk/pocketalks
+          rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            "$GITHUB_WORKSPACE/" device/pocketalk/pocketalks/
+
+      - name: Build recovery image
+        run: |
+          set -o pipefail
+          cd "$HOME/twrp-src"
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          lunch omni_pocketalks-eng
+          mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+      - name: Collect outputs
+        if: always()
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/out-artifacts"
+          if [ -f "$HOME/twrp-src/out/target/product/pocketalks/recovery.img" ]; then
+            cp "$HOME/twrp-src/out/target/product/pocketalks/recovery.img" "$GITHUB_WORKSPACE/out-artifacts/"
+          fi
+          if [ -f "$HOME/twrp-src/out/target/product/pocketalks/recovery.log" ]; then
+            cp "$HOME/twrp-src/out/target/product/pocketalks/recovery.log" "$GITHUB_WORKSPACE/out-artifacts/"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/build.log" ]; then
+            cp "$GITHUB_WORKSPACE/build.log" "$GITHUB_WORKSPACE/out-artifacts/"
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twrp-pocketalks-${{ github.run_id }}
+          path: out-artifacts/
+          if-no-files-found: warn
