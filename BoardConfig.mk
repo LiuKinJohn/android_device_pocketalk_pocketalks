@@ -1,7 +1,8 @@
 DEVICE_PATH := device/pocketalk/pocketalks
 
 TARGET_ARCH := arm
-TARGET_ARCH_VARIANT := armv7-a-neon
+# twrp-11 build system expects armv8-a for MT6739-class Cortex-A53 targets.
+TARGET_ARCH_VARIANT := armv8-a
 TARGET_CPU_ABI := armeabi-v7a
 TARGET_CPU_ABI2 := armeabi
 TARGET_CPU_VARIANT := cortex-a53

@@ -128,6 +128,27 @@ jobs:
             --exclude '.github' \
             "$GITHUB_WORKSPACE/" device/pocketalk/pocketalks/
 
+      - name: Preflight sanity checks
+        run: |
+          set -euo pipefail
+          cd "$HOME/twrp-src"
+
+          test -f vendor/twrp/config/common.mk
+          test -f device/pocketalk/pocketalks/BoardConfig.mk
+          test -f device/pocketalk/pocketalks/AndroidProducts.mk
+          test -f device/pocketalk/pocketalks/omni_pocketalks.mk
+          test -f device/pocketalk/pocketalks/prebuilt/kernel
+          test -f device/pocketalk/pocketalks/recovery/root/etc/recovery.fstab
+
+          echo "=== BoardConfig key values ==="
+          grep -E '^(TARGET_ARCH|TARGET_ARCH_VARIANT|TARGET_CPU_ABI|TARGET_PREBUILT_KERNEL|BOARD_KERNEL_PAGESIZE|BOARD_BOOTIMAGE_PARTITION_SIZE|BOARD_RECOVERYIMAGE_PARTITION_SIZE)' \
+            device/pocketalk/pocketalks/BoardConfig.mk || true
+
+          if grep -q '^TARGET_ARCH_VARIANT := armv7-a-neon' device/pocketalk/pocketalks/BoardConfig.mk; then
+            echo "Invalid TARGET_ARCH_VARIANT for current source base: armv7-a-neon" >&2
+            exit 1
+          fi
+
       - name: Build recovery image
         run: |
           set -o pipefail
