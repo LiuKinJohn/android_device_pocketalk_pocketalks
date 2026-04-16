@@ -26,7 +26,8 @@ BOARD_TAGS_OFFSET := 0x00000100
 # TODO: Replace with extracted kernel (zImage/Image.gz) from stock boot image.
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/kernel
 
-BOARD_INCLUDE_DTB_IN_BOOTIMG := true
+# Prebuilt-kernel porting path: do not require a generated dtb.img at build time.
+BOARD_INCLUDE_DTB_IN_BOOTIMG := false
 BOARD_HAS_NO_SELECT_BUTTON := true
 BOARD_SUPPRESS_SECURE_ERASE := true
 TARGET_USERIMAGES_USE_EXT4 := true

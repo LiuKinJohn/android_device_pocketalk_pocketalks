@@ -145,12 +145,16 @@ jobs:
           test -f device/pocketalk/pocketalks/recovery/root/etc/recovery.fstab
 
           echo "=== BoardConfig key values ==="
-          grep -E '^(TARGET_ARCH|TARGET_ARCH_VARIANT|TARGET_CPU_ABI|TARGET_PREBUILT_KERNEL|BOARD_KERNEL_PAGESIZE|BOARD_BOOTIMAGE_PARTITION_SIZE|BOARD_RECOVERYIMAGE_PARTITION_SIZE)' \
+          grep -E '^(TARGET_ARCH|TARGET_ARCH_VARIANT|TARGET_CPU_ABI|TARGET_PREBUILT_KERNEL|BOARD_KERNEL_PAGESIZE|BOARD_BOOTIMAGE_PARTITION_SIZE|BOARD_RECOVERYIMAGE_PARTITION_SIZE|BOARD_INCLUDE_DTB_IN_BOOTIMG)' \
             device/pocketalk/pocketalks/BoardConfig.mk || true
 
           if grep -q '^TARGET_ARCH_VARIANT := armv7-a-neon' device/pocketalk/pocketalks/BoardConfig.mk; then
             echo "Invalid TARGET_ARCH_VARIANT for current source base: armv7-a-neon" >&2
             exit 1
+          fi
+
+          if grep -q '^BOARD_INCLUDE_DTB_IN_BOOTIMG := true' device/pocketalk/pocketalks/BoardConfig.mk; then
+            echo "BOARD_INCLUDE_DTB_IN_BOOTIMG is true; dtb.img build rule must exist or recovery build will fail." >&2
           fi
 
           echo "=== Any remaining armv7-a-neon references under device tree ==="
@@ -184,7 +188,15 @@ jobs:
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
           lunch "$LUNCH_TARGET"
-          mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+          MEM_KB=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+          JOBS=$(nproc --all)
+          if [ "$MEM_KB" -lt 16777216 ]; then
+            JOBS=6
+          fi
+          echo "Using parallel jobs: $JOBS (MemTotal=${MEM_KB}KB)"
+
+          mka recoveryimage -j"$JOBS" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
       - name: Collect outputs
         if: always()
