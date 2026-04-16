@@ -158,8 +158,9 @@ jobs:
 
       - name: Verify lunch and dumpvars
         run: |
-          set -euo pipefail
+          set -eo pipefail
           cd "$HOME/twrp-src"
+          export ZSH_VERSION="${ZSH_VERSION-}"
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
 
