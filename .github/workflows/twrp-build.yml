@@ -134,7 +134,7 @@ jobs:
           cd "$HOME/twrp-src"
           source build/envsetup.sh
           export ALLOW_MISSING_DEPENDENCIES=true
-          lunch omni_pocketalks-eng
+          lunch omni_pocketalks-eng || lunch omni_pocketalks-userdebug
           mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
       - name: Collect outputs
