@@ -30,6 +30,54 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y repo rsync git-lfs
 
+      - name: Resolve available TWRP manifest branch
+        run: |
+          set -euo pipefail
+          MANIFEST_URL="https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git"
+
+          mapfile -t REMOTE_BRANCHES < <(
+            git ls-remote --heads "$MANIFEST_URL" \
+              | awk '{print $2}' \
+              | sed 's#refs/heads/##'
+          )
+
+          if [ "${#REMOTE_BRANCHES[@]}" -eq 0 ]; then
+            echo "No remote branches found for $MANIFEST_URL" >&2
+            exit 1
+          fi
+
+          PREFERRED=(
+            "twrp-9.0"
+            "twrp-10.0"
+            "twrp-11.0"
+            "twrp-11"
+            "twrp-12.1"
+            "twrp-13.0"
+            "twrp-14.0"
+          )
+
+          SELECTED=""
+          for b in "${PREFERRED[@]}"; do
+            if printf '%s\n' "${REMOTE_BRANCHES[@]}" | grep -qx "$b"; then
+              SELECTED="$b"
+              break
+            fi
+          done
+
+          if [ -z "$SELECTED" ]; then
+            # Fallback: pick the newest twrp-* branch if preferred list is unavailable.
+            SELECTED=$(printf '%s\n' "${REMOTE_BRANCHES[@]}" | grep '^twrp-' | sort -Vr | head -n1 || true)
+          fi
+
+          if [ -z "$SELECTED" ]; then
+            echo "No twrp-* branch found at $MANIFEST_URL" >&2
+            exit 1
+          fi
+
+          echo "MANIFEST_URL=$MANIFEST_URL" >> "$GITHUB_ENV"
+          echo "MANIFEST_BRANCH=$SELECTED" >> "$GITHUB_ENV"
+          echo "Using manifest branch: $SELECTED"
+
       - name: Extract kernel from stock boot image
         run: |
           python3 - << 'PY'
@@ -68,7 +116,7 @@ jobs:
         run: |
           mkdir -p "$HOME/twrp-src"
           cd "$HOME/twrp-src"
-          repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-9.0 --depth=1
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH" --depth=1
           repo sync -c --no-clone-bundle --no-tags -j"$(nproc --all)"
 
       - name: Inject device tree
