@@ -17,10 +17,12 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 180
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Free disk and install dependencies
         run: |
@@ -91,6 +93,11 @@ jobs:
         if: always()
         run: |
           mkdir -p "$GITHUB_WORKSPACE/out-artifacts"
+          {
+            echo "run_id=${{ github.run_id }}"
+            echo "run_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "collected_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$GITHUB_WORKSPACE/out-artifacts/run-info.txt"
           if [ -f "$HOME/twrp-src/out/target/product/pocketalks/recovery.img" ]; then
             cp "$HOME/twrp-src/out/target/product/pocketalks/recovery.img" "$GITHUB_WORKSPACE/out-artifacts/"
           fi
@@ -103,7 +110,7 @@ jobs:
 
       - name: Upload artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: twrp-pocketalks-${{ github.run_id }}
           path: out-artifacts/
