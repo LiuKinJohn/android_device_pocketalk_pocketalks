@@ -182,8 +182,6 @@ jobs:
           echo "Resolved TARGET_CPU_VARIANT=$(get_build_var TARGET_CPU_VARIANT)"
 
       - name: Build recovery image
-        id: build_recovery
-        continue-on-error: true
         run: |
           set -o pipefail
           cd "$HOME/twrp-src"
@@ -201,7 +199,7 @@ jobs:
           mka recoveryimage -j"$JOBS" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
       - name: Summarize build failure
-        if: steps.build_recovery.outcome == 'failure'
+        if: failure()
         run: |
           set -eo pipefail
           echo "Build failed. Collecting key error lines from build.log ..."
@@ -219,10 +217,6 @@ jobs:
           else
             echo "::error title=TWRP build failed::build.log not found"
           fi
-
-      - name: Fail workflow when build failed
-        if: steps.build_recovery.outcome == 'failure'
-        run: exit 1
 
       - name: Collect outputs
         if: always()
