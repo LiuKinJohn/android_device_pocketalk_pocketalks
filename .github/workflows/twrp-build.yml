@@ -182,6 +182,8 @@ jobs:
           echo "Resolved TARGET_CPU_VARIANT=$(get_build_var TARGET_CPU_VARIANT)"
 
       - name: Build recovery image
+        id: build_recovery
+        continue-on-error: true
         run: |
           set -o pipefail
           cd "$HOME/twrp-src"
@@ -197,6 +199,30 @@ jobs:
           echo "Using parallel jobs: $JOBS (MemTotal=${MEM_KB}KB)"
 
           mka recoveryimage -j"$JOBS" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+      - name: Summarize build failure
+        if: steps.build_recovery.outcome == 'failure'
+        run: |
+          set -eo pipefail
+          echo "Build failed. Collecting key error lines from build.log ..."
+          mkdir -p "$GITHUB_WORKSPACE/out-artifacts"
+
+          if [ -f "$GITHUB_WORKSPACE/build.log" ]; then
+            tail -n 250 "$GITHUB_WORKSPACE/build.log" > "$GITHUB_WORKSPACE/out-artifacts/build-tail.log" || true
+
+            FIRST_FAIL=$(grep -E -m1 '(^FAILED:|error:|ninja failed|missing and no known rule to make it)' "$GITHUB_WORKSPACE/build.log" || true)
+            if [ -n "$FIRST_FAIL" ]; then
+              echo "::error title=TWRP build failed::$FIRST_FAIL"
+            else
+              echo "::error title=TWRP build failed::No canonical error line matched; check build-tail.log"
+            fi
+          else
+            echo "::error title=TWRP build failed::build.log not found"
+          fi
+
+      - name: Fail workflow when build failed
+        if: steps.build_recovery.outcome == 'failure'
+        run: exit 1
 
       - name: Collect outputs
         if: always()
